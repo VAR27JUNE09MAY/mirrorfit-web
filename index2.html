@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101018">
+<title>MirrorFit — Virtual Fitting Mirror</title>
+
+<style>
+:root {
+  --bg:#101018;
+  --panel:#1b1b28;
+  --text:#f7f4ff;
+  --muted:#b8b3cd;
+  --purple:#bda6ff;
+  --mint:#a0efd2;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:system-ui,sans-serif;
+  line-height:1.6;
+}
+main{max-width:1200px;margin:auto;padding:24px}
+header{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:15px;padding-bottom:22px;border-bottom:1px solid #ffffff20;
+}
+.logo{font-size:27px;font-weight:800;letter-spacing:-1px}
+.logo span{color:var(--purple)}
+.badge{
+  border:1px solid #ffffff25;border-radius:30px;
+  padding:6px 12px;font-size:11px;color:var(--mint);
+}
+h1{
+  font-size:clamp(35px,5vw,60px);line-height:1.1;
+  letter-spacing:-2px;margin:35px 0 16px;
+}
+h1 span{color:var(--purple)}
+.intro{color:var(--muted);max-width:720px;margin-bottom:28px}
+.layout{display:grid;grid-template-columns:1.65fr 1fr;gap:22px}
+.panel{
+  background:var(--panel);border:1px solid #ffffff20;
+  border-radius:22px;overflow:hidden;
+}
+.mirror{
+  position:relative;aspect-ratio:4/3;
+  background:radial-gradient(ellipse,#362b51,#13131e);
+  display:grid;place-items:center;
+}
+canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  transform:scaleX(-1);
+}
+.placeholder{text-align:center;padding:25px;color:var(--muted)}
+.placeholder strong{display:block;color:var(--text);font-size:25px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;padding:18px}
+button,select,input{font:inherit}
+button{
+  border:0;border-radius:10px;padding:12px 18px;
+  background:var(--purple);color:#1a1425;
+  font-weight:700;cursor:pointer;
+}
+button:disabled{opacity:.5;cursor:not-allowed}
+.secondary{background:#ffffff12;color:white}
+#status{padding:0 18px 18px;color:var(--mint);font-size:12px}
+.controls{padding:24px}
+h2{font-size:19px;margin:0 0 16px}
+label{display:block;margin-top:18px;font-size:13px;color:var(--muted)}
+select{
+  width:100%;margin-top:8px;padding:12px;border-radius:10px;
+  background:#11111b;color:white;border:1px solid #ffffff25;
+}
+input[type=range]{width:100%;accent-color:var(--purple)}
+.note{font-size:12px;color:var(--muted)}
+.suggestions{
+  margin-top:25px;padding-top:22px;border-top:1px solid #ffffff20;
+}
+#outfit{color:var(--mint);font-size:14px}
+footer{margin-top:25px;color:var(--muted);font-size:12px}
+:focus-visible{outline:3px solid var(--mint);outline-offset:4px}
+[hidden]{display:none!important}
+@media(max-width:800px){
+  .layout{grid-template-columns:1fr}
+  main{padding:16px}
+  header{align-items:start}
+}
+</style>
+</head>
+
+<body>
+<main>
+  <header>
+    <div class="logo">MirrorFit<span>.</span></div>
+    <span class="badge">SMART MIRROR PROTOTYPE</span>
+  </header>
+
+  <h1>Meet your next look.<br><span>Skip the changing room.</span></h1>
+
+  <p class="intro">
+    Stand in front of your camera and explore a pose-tracked garment
+    illustration. No installation or account required.
+  </p>
+
+  <div class="layout">
+    <section class="panel" aria-label="Virtual mirror">
+      <div class="mirror" id="mirror">
+        <div class="placeholder" id="placeholder">
+          <strong>Your mirror is ready.</strong>
+          Camera access starts only when you choose.
+        </div>
+        <video id="video" autoplay muted playsinline hidden></video>
+        <canvas id="canvas" aria-label="Live virtual garment preview"></canvas>
+      </div>
+
+      <div class="toolbar">
+        <button id="start" type="button">Start camera</button>
+        <button id="stop" type="button" class="secondary" disabled>
+          Stop camera
+        </button>
+      </div>
+      <div id="status" role="status">Camera is off.</div>
+    </section>
+
+    <section class="panel controls">
+      <h2>01 / Choose your look</h2>
+
+      <label for="garment">Demo garment</label>
+      <select id="garment">
+        <option value="tee">Everyday Tee</option>
+        <option value="dress">City Dress</option>
+      </select>
+
+      <label for="color">Color</label>
+      <select id="color">
+        <option value="#b19ae7">Violet</option>
+        <option value="#95ddbd">Mint</option>
+        <option value="#df97b1">Rose</option>
+        <option value="#8fb9e9">Blue</option>
+        <option value="#e7dbc4">Cream</option>
+      </select>
+
+      <label for="scale">Overlay scale—not clothing size</label>
+      <input id="scale" type="range"
+             min="0.75" max="1.4" step="0.01" value="1">
+
+      <p class="note">
+        Face forward, with shoulders and hips visible.
+        Keep one person in the camera view.
+        This is a 2D illustration, not a physical-fit measurement.
+      </p>
+
+      <div class="suggestions">
+        <h2>02 / Outfit inspiration</h2>
+        <label for="occasion">Occasion</label>
+        <select id="occasion">
+          <option value="casual">Casual day</option>
+          <option value="college">College</option>
+          <option value="evening">Evening out</option>
+        </select>
+        <p id="outfit" aria-live="polite"></p>
+        <p class="note">
+          Preset styling suggestions—not generated by an LLM.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    MirrorFit · Varsha C V<br>
+    This app does not save or upload camera frames. Pose processing runs
+    in your browser; model assets load from an external CDN.<br>
+    Illustrative garments only. No size, fit, or fabric-drape guarantee.
+  </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js"></script>
+
+<script>
+const $ = id => document.getElementById(id);
+const video = $("video");
+const canvas = $("canvas");
+const ctx = canvas.getContext("2d");
+
+let pose = null;
+let stream = null;
+let active = false;
+let starting = false;
+let pending = null;
+let animationFrame = null;
+let smooth = null;
+let garmentImage = null;
+let imageVersion = 0;
+
+function updateSuggestions() {
+  const suggestions = {
+    tee: {
+      casual: "Pair the tee with relaxed jeans and sneakers.",
+      college: "Try straight-leg trousers, comfortable sneakers, and a backpack.",
+      evening: "Layer with a jacket and add dark trousers for a simple evening look."
+    },
+    dress: {
+      casual: "Pair the dress with flat sandals and a light overshirt.",
+      college: "Try a denim jacket, comfortable flats, and a tote bag.",
+      evening: "Add a simple necklace, a small bag, and shoes you enjoy wearing."
+    }
+  };
+  $("outfit").textContent =
+    suggestions[$("garment").value][$("occasion").value];
+}
+
+function updateGarment() {
+  const dress = $("garment").value === "dress";
+  const color = $("color").value;
+  const height = dress ? 310 : 220;
+
+  const path = dress
+    ? "M65 18 L85 12 Q100 34 115 12 L135 18 L151 67 L130 81 L145 140 L183 293 L17 293 L55 140 L70 81 L49 67 Z"
+    : "M60 20 L82 12 Q100 35 118 12 L140 20 L190 65 L158 102 L140 85 L145 205 L55 205 L60 85 L42 102 L10 65 Z";
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg"
+         width="200" height="${height}" viewBox="0 0 200 ${height}">
+      <path d="${path}" fill="${color}"
+            stroke="#ffffff66" stroke-width="2"/>
+      <path d="M82 12 Q100 35 118 12"
+            fill="none" stroke="#00000033" stroke-width="4"/>
+      <path d="M76 65 Q67 135 76 ${height-25}
+               M124 65 Q133 135 124 ${height-25}"
+            fill="none" stroke="#00000015" stroke-width="3"/>
+    </svg>`;
+
+  const version = ++imageVersion;
+  const image = new Image();
+  image.onload = () => {
+    if (version === imageVersion) garmentImage = image;
+  };
+  image.src = "data:image/svg+xml;charset=utf-8," +
+    encodeURIComponent(svg);
+
+  updateSuggestions();
+}
+
+function render(results) {
+  if (!active) return;
+
+  const width = video.videoWidth;
+  const height = video.videoHeight;
+  if (!width || !height) return;
+
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+    $("mirror").style.aspectRatio = `${width} / ${height}`;
+  }
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(results.image, 0, 0, width, height);
+
+  const landmarks = results.poseLandmarks;
+  if (!landmarks || [11,12,23,24].some(
+    i => (landmarks[i].visibility ?? 0) < 0.65
+  )) {
+    smooth = null;
+    $("status").textContent =
+      "Step back and face forward. Keep shoulders and hips visible.";
+    return;
+  }
+
+  const point = i => ({
+    x: landmarks[i].x * width,
+    y: landmarks[i].y * height
+  });
+
+  const [left, right] = [point(11), point(12)]
+    .sort((a,b) => a.x - b.x);
+
+  const hipA = point(23);
+  const hipB = point(24);
+  const x = (left.x + right.x) / 2;
+  const y = (left.y + right.y) / 2;
+
+  const target = {
+    x, y,
+    shoulder: Math.hypot(right.x-left.x, right.y-left.y),
+    torso: Math.hypot(
+      (hipA.x+hipB.x)/2-x,
+      (hipA.y+hipB.y)/2-y
+    ),
+    angle: Math.atan2(right.y-left.y, right.x-left.x)
+  };
+
+  if (!smooth) {
+    smooth = {...target};
+  } else {
+    for (const key of Object.keys(target)) {
+      smooth[key] += (target[key]-smooth[key]) * 0.3;
+    }
+  }
+
+  if (garmentImage) {
+    const scale = Number($("scale").value);
+    const dress = $("garment").value === "dress";
+    const w = smooth.shoulder * 2.15 * scale;
+    const h = smooth.torso * (dress ? 2.65 : 1.25) * scale;
+
+    ctx.save();
+    ctx.translate(smooth.x, smooth.y);
+    ctx.rotate(smooth.angle);
+    ctx.globalAlpha = 0.93;
+    ctx.drawImage(garmentImage, -w/2, -h*0.07, w, h);
+    ctx.restore();
+  }
+
+  $("status").textContent =
+    "Tracking active · Visual preview only, not a fit measurement.";
+}
+
+function stopCamera() {
+  active = false;
+  cancelAnimationFrame(animationFrame);
+  stream?.getTracks().forEach(track => track.stop());
+  stream = null;
+  video.srcObject = null;
+  smooth = null;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  $("placeholder").hidden = false;
+  $("stop").disabled = true;
+  $("start").disabled = starting;
+  $("status").textContent = "Camera off.";
+}
+
+async function processFrame() {
+  if (!active) return;
+
+  try {
+    if (video.readyState >= 2) {
+      pending = pose.send({image: video});
+      await pending;
+    }
+  } catch {
+    stopCamera();
+    $("status").textContent =
+      "Tracking could not run. Reload and try Chrome or Edge.";
+  } finally {
+    pending = null;
+  }
+
+  if (active) {
+    animationFrame = requestAnimationFrame(processFrame);
+  }
+}
+
+async function startCamera() {
+  if (active || starting) return;
+  starting = true;
+  $("start").disabled = true;
+  $("status").textContent = "Loading camera and pose model…";
+
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("Open the app using its HTTPS GitHub Pages address.");
+    }
+
+    if (typeof Pose === "undefined") {
+      throw new Error("Model library unavailable. Check your internet connection.");
+    }
+
+    if (pending) await pending.catch(() => {});
+
+    if (!pose) {
+      pose = new Pose({
+        locateFile: file =>
+          "https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/" + file
+      });
+
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6
+      });
+
+      pose.onResults(render);
+    }
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "user",
+        width: {ideal: 960},
+        height: {ideal: 720}
+      },
+      audio: false
+    });
+
+    video.srcObject = stream;
+    await video.play();
+
+    if (document.hidden) {
+      stopCamera();
+      return;
+    }
+
+    active = true;
+    $("placeholder").hidden = true;
+    $("stop").disabled = false;
+    processFrame();
+  } catch (error) {
+    stopCamera();
+
+    $("status").textContent = error.name === "NotAllowedError"
+      ? "Camera permission was denied. Allow it in your browser's site settings."
+      : "Could not start: " + error.message;
+  } finally {
+    starting = false;
+    $("start").disabled = active;
+  }
+}
+
+$("start").addEventListener("click", startCamera);
+$("stop").addEventListener("click", stopCamera);
+$("garment").addEventListener("change", updateGarment);
+$("color").addEventListener("change", updateGarment);
+$("occasion").addEventListener("change", updateSuggestions);
+
+window.addEventListener("pagehide", stopCamera);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && active) stopCamera();
+});
+
+updateGarment();
+</script>
+</body>
+</html>
